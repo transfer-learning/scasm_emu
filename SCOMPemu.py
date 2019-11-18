@@ -16,12 +16,12 @@ def OUTPUT(port, val):
 class SCOMP_STATE:
     def __init__(self):
         self.PC = 0
-        self.MAR = 0
         self.AC = 0
         self.memory = [0]*2048
         self.stack = []
-        self.EI = False
-        self.INT=0
+        self.EI = 0
+        self.INT = None
+        self.IRQ = None
         pass
 
     def disassemble(self, opcode, data):
@@ -70,9 +70,9 @@ class SCOMP_STATE:
         elif opcode == 0x13: # OUT
             return "OUT %02X" % (data & 0xFF,)
         elif opcode == 0x14: # CLI (DI)
-            return "CLI (DI)"
+            return "CLI (DI) %s" % (Bits(uint=data & 0xF, length=4).bin,)
         elif opcode == 0x15: # SEI (EI)
-            return "SEI (EI)"
+            return "SEI (EI) %s" % (Bits(uint=data & 0xF, length=4).bin,)
         elif opcode == 0x16: # RETI
             return "RETI"
         elif opcode == 0x17: # LOADI
@@ -130,22 +130,31 @@ class SCOMP_STATE:
             OUTPUT(data & 0xFF, self.AC)
             pass
         elif opcode == 0x14: # CLI (DI)
-            self.EI = False
+            self.EI &= (~(data & 0xF) & 0xF)
             pass
         elif opcode == 0x15: # SEI (EI)
-            self.EI = True
+            self.EI |= data & 0xF
             pass
         elif opcode == 0x16: # RETI
-            self.PC = self.INT
-            self.INT = None
+            if self.INT is not None:
+                self.PC = self.INT
+                self.INT = None
         elif opcode == 0x17: # LOADI
-            self.PC = imm
+            self.AC = imm
         self.AC &= 0xFFFF
         self.PC &= 0xFFFF
         return "%04X: %s" % (self.PC - 1, self.disassemble(opcode, data))
 
+    def interrupt(self, location): # location = target address (1-4)
+        self.IRQ = location
+        pass
 
     def step(self):
+        if self.IRQ is not None:
+            if self.EI and self.INT is None:
+                self.INT = self.PC
+                self.PC = self.IRQ
+            self.IRQ = None
         mem_data = self.memory[self.PC]
         opcode = (mem_data >> 11) & 0x1F
         data = (mem_data & 0x7FF)
@@ -157,7 +166,8 @@ class SCOMP_STATE:
         return str(self)
 
     def __str__(self):
-        return "PC = 0x%04X; AC = 0x%04X (%d)" % (self.PC, self.AC, two_comp_tostring(self.AC))
+        return "PC = 0x%04X; AC = 0x%04X (%d); INT_VEC: %s" % \
+               (self.PC, self.AC, two_comp_tostring(self.AC), Bits(uint=self.EI & 0xF, length=4).bin)
 
 
 if __name__ == '__main__':
@@ -179,7 +189,7 @@ if __name__ == '__main__':
             val = struct.unpack(">H", b1)
             scomp.memory[addr] = val[0]
             addr += 1
-        print("DUMPED: %d bytes" % (addr - 1))
+        print("Program Loaded: %d words" % (addr - 1))
 
     while True:
         if scomp.PC == 0x7FF:
