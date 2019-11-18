@@ -4,7 +4,7 @@ import argparse
 import struct
 
 def two_comp_tostring(number):
-    return Bits(bin=bin(number)[2:]).int
+    return Bits(uint=number, length=16).int
 
 def INPUT(PORT):
     print("INPUT(0x%02X):" % (PORT,))
@@ -33,9 +33,9 @@ class SCOMP_STATE:
         elif opcode == 0x2:
             return "STORE [%04X]" % (data,)
         elif opcode == 0x3: # ADD
-            return "ADD %04X" % (two_comp_tostring(imm),)
+            return "ADD [%04X] (%d)" % (data, self.memory[data],)
         elif opcode == 0x4: # SUB
-            return "SUB %04X" % (two_comp_tostring(imm),)
+            return "SUB [%04X]" % (two_comp_tostring(imm),)
         elif opcode == 0x5: # JUMP
             return "JUMP %04X" % (data,)
         elif opcode == 0x6: # JNEG
@@ -87,17 +87,20 @@ class SCOMP_STATE:
         elif opcode == 0x2: # STORE
             self.memory[data] = self.AC
         elif opcode == 0x3: # ADD
-            self.AC += imm
+            self.AC += self.memory[data]
         elif opcode == 0x4: # SUB
-            self.AC -= imm
+            self.AC -= self.memory[data]
         elif opcode == 0x5: # JUMP
             self.PC = data
         elif opcode == 0x6: # JNEG
-            if self.AC < 0: self.PC = imm
+            if self.AC < 0:
+                self.PC = imm
         elif opcode == 0x7: # JPOS
-            if self.AC > 0: self.PC = imm
+            if self.AC > 0:
+                self.PC = imm
         elif opcode == 0x8: # JZERO
-            if self.AC == 0: self.PC = data
+            if self.AC == 0:
+                self.PC = data
         elif opcode == 0x9: # AND
             self.AC &= self.memory[data]
         elif opcode == 0xa: # OR
@@ -139,24 +142,22 @@ class SCOMP_STATE:
             self.PC = imm
         self.AC &= 0xFFFF
         self.PC &= 0xFFFF
-        return "%04X: %s" % (self.PC, self.disassemble(opcode, data))
+        return "%04X: %s" % (self.PC - 1, self.disassemble(opcode, data))
 
 
     def step(self):
         mem_data = self.memory[self.PC]
         opcode = (mem_data >> 11) & 0x1F
         data = (mem_data & 0x7FF)
+        self.PC = (self.PC + 1) & 0x7FF
         disassembled = self.execute_instruction(opcode, data)
-        print(disassembled)
-        self.PC += 1
-        self.PC &= 0x7FF
-        pass
+        return disassembled
 
     def __repr__(self):
         return str(self)
 
     def __str__(self):
-        return "PC = 0x%04X; MAR = 0x%04X; AC = 0x%04X" % (self.PC, self.MAR, self.AC)
+        return "PC = 0x%04X; AC = 0x%04X (%d)" % (self.PC, self.AC, two_comp_tostring(self.AC))
 
 
 if __name__ == '__main__':
@@ -170,16 +171,20 @@ if __name__ == '__main__':
     scomp = SCOMP_STATE()
     # LOAD
     with open(args.file, 'rb') as file:
+        addr = 0
         while True:
             b1 = file.read(2)
             if len(b1) != 2:
                 break
             val = struct.unpack(">H", b1)
-            print("%04X" % (val[0],))
-        pass
+            scomp.memory[addr] = val[0]
+            addr += 1
+        print("DUMPED: %d bytes" % (addr - 1))
 
-
-    scomp.memory[0] = 0x0
     while True:
-        scomp.step()
+        if scomp.PC == 0x7FF:
+            break
+        dis = scomp.step()
+        print('%s --> %s' % (scomp.__str__(), dis), end='\n')
+        time.sleep(0.1)
     print(scomp)
