@@ -89,7 +89,7 @@ class SCOMP_STATE:
     def disassemble(self, opcode, data):
         imm = (data | (-(data & (1 << 10)))) & 0xFFFF
         if opcode == 0x0:
-            return "NOP"
+            return "NOP (0x%04X)" % (opcode << 11 | data)
         elif opcode == 0x1:
             return "LOAD " + "[0x%04X]" % (data,)
         elif opcode == 0x2:
