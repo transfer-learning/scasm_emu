@@ -9,15 +9,6 @@ enable_screen = False
 def two_comp_tostring(number):
     return Bits(uint=number, length=16).int
 
-def INPUT(PORT):
-    if not(enable_screen):
-        print("INPUT(0x%02X):" % (PORT,))
-    return 0
-
-def OUTPUT(port, val):
-    if not(enable_screen):
-        print("OUTPUT(0x%02X): %d" % (port, val))
-
 class SCOMP_STATE:
     def __init__(self):
         self.PC = 0
@@ -27,7 +18,63 @@ class SCOMP_STATE:
         self.EI = 0
         self.INT = None
         self.IRQ = None
-        pass
+        self.ticks = 0
+
+        self.device_mem = [0x0] * 256
+
+        self.devices = {
+            "SWITCHES": 0x0,
+            "LEDS": 0x01,
+            "TIMER": 0x02,
+            "XIO": 0x03,
+            "SSEG1": 0x04,
+            "SSEG2": 0x05,
+            "LCD": 0x06,
+            "XLEDS": 0x07,
+            "BEEP": 0x0A,
+            "CTIMER": 0x0C,
+            "LPOS": 0x80,
+            "LVEL": 0x82,
+            "LVELCMD": 0x83,
+            "I2C_CMD": 0x90,
+            "I2C_DATA": 0x91,
+            "I2C_RDY": 0x92,
+            "UART_DAT": 0x98,
+            "UART_RDY": 0x99,
+            "DIST0": 0xA8,
+            "DIST1": 0xA9,
+            "DIST2": 0xAA,
+            "DIST3": 0xAB,
+            "DIST4": 0xAC,
+            "DIST5": 0xAD,
+            "DIST6": 0xAE,
+            "DIST7": 0xAF,
+            "SONARALARM": 0xB0,
+            "SONARINT": 0xB1,
+            "SONAREN": 0xB2,
+            "XPOS": 0xC0,
+            "YPOS": 0xC1,
+            "THETA": 0xC2,
+            "RESETPOS": 0xC3,
+            "IR_HI": 0xD0,
+            "IR_LO": 0xD1
+        }
+
+    def INPUT(self, PORT):
+        if not (enable_screen):
+            print("INPUT(0x%02X):" % (PORT,))
+        return self.device_mem[PORT]
+
+    def OUTPUT(self, port, val):
+        if not (enable_screen):
+            print("OUTPUT(0x%02X): %d" % (port, val))
+
+        if self.devices["SSEG1"] == port:
+            print(f"SSEG1: {val}")
+        if self.devices["SSEG2"] == port:
+            print(f"SSEG2: {val}")
+
+        self.device_mem[port] = val
 
     def reset(self):
         self.PC = 0
@@ -137,10 +184,10 @@ class SCOMP_STATE:
         elif opcode == 0x11: # RET
             self.PC = self.stack.pop()
         elif opcode == 0x12: # IN
-            self.AC = INPUT(data & 0xFF)
+            self.AC = self.INPUT(data & 0xFF)
             pass
         elif opcode == 0x13:
-            OUTPUT(data & 0xFF, self.AC)
+            self.OUTPUT(data & 0xFF, self.AC)
             pass
         elif opcode == 0x14: # CLI (DI)
             self.EI &= (~(data & 0xF) & 0xF)
@@ -168,6 +215,11 @@ class SCOMP_STATE:
         data = (mem_data & 0x7FF)
         return self.disassemble(opcode, data)
 
+    def check_interrupt(self):
+        # TIMER
+        if self.ticks % (TICKS_PER_SEC / 10):
+            self.interrupt(2)
+
     def step(self):
         if self.IRQ is not None:
             if self.EI and self.INT is None:
@@ -179,6 +231,8 @@ class SCOMP_STATE:
         data = (mem_data & 0x7FF)
         self.PC = (self.PC + 1) & 0x7FF
         disassembled = self.execute_instruction(opcode, data)
+        self.ticks += 1
+        self.check_interrupt()
         return disassembled
 
     def __repr__(self):
@@ -187,6 +241,18 @@ class SCOMP_STATE:
     def __str__(self):
         return "PC = 0x%04X; AC = 0x%04X (%d); INT_VEC: %s" % \
                (self.PC, self.AC, two_comp_tostring(self.AC), Bits(uint=self.EI & 0xF, length=4).bin)
+
+    def lookup(self, param, signed=True):
+        if signed:
+            return two_comp_tostring(self.device_mem[self.devices[param]])
+        else:
+            return self.device_mem[self.devices[param]]
+
+    def set(self, param, val):
+        self.device_mem[self.devices[param]] = val & 0xFFFF
+
+
+TICKS_PER_SEC = 4500000
 
 if __name__ == '__main__':
     argp = argparse.ArgumentParser()
@@ -220,14 +286,13 @@ if __name__ == '__main__':
         screen.nodelay(True)
         core_win = curses.newwin(60, 60, 0, 0)
 
-
     run = False
     while True:
         if scomp.PC == 0x7FF:
             break
         if not(enable_screen):
             dis = scomp.step()
-            print('%s --> %s' % (scomp.__str__(), dis), end='\n')
+            # print('%s --> %s' % (scomp.__str__(), dis), end='\n')
         else:
             cmd = screen.getch(0,0)
             if cmd == ord('s'):
@@ -258,5 +323,4 @@ if __name__ == '__main__':
                     core_win.addstr(14+i, 0, val)
             core_win.refresh()
             screen.refresh()
-        time.sleep(0.01)
     print(scomp)
