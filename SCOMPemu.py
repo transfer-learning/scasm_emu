@@ -21,7 +21,6 @@ class SCOMP_STATE:
         self.ticks = 0
 
         self.device_mem = [0x0] * 256
-
         self.devices = {
             "SWITCHES": 0x0,
             "LEDS": 0x01,
@@ -59,6 +58,7 @@ class SCOMP_STATE:
             "IR_HI": 0xD0,
             "IR_LO": 0xD1
         }
+        self.device_mem[self.devices['XIO']] = 0b10000
 
     def INPUT(self, PORT):
         if not (enable_screen):
@@ -89,46 +89,46 @@ class SCOMP_STATE:
         if opcode == 0x0:
             return "NOP"
         elif opcode == 0x1:
-            return "LOAD " + "[%04X]" % (data,)
+            return "LOAD " + "[0x%04X]" % (data,)
         elif opcode == 0x2:
-            return "STORE [%04X]" % (data,)
+            return "STORE [0x%04X]" % (data,)
         elif opcode == 0x3: # ADD
-            return "ADD [%04X] (%d)" % (data, self.memory[data],)
+            return "ADD [0x%04X] (%d)" % (data, self.memory[data],)
         elif opcode == 0x4: # SUB
-            return "SUB [%04X]" % (two_comp_tostring(imm),)
+            return "SUB [0x%04X]" % (two_comp_tostring(imm),)
         elif opcode == 0x5: # JUMP
-            return "JUMP %04X" % (data,)
+            return "JUMP 0x%04X" % (data,)
         elif opcode == 0x6: # JNEG
-            return "JNEG %04X" % (data,)
+            return "JNEG 0x%04X" % (data,)
         elif opcode == 0x7: # JPOS
-            return "JPOS %04X" % (data,)
+            return "JPOS 0x%04X" % (data,)
         elif opcode == 0x8: # JZERO
-            return "JZERO %04X" % (data,)
+            return "JZERO 0x%04X" % (data,)
         elif opcode == 0x9: # AND
-            return "AND [%04X]" % (imm, )
+            return "AND [0x%04X]" % (imm, )
         elif opcode == 0xa: # OR
-            return "OR [%04X]" % (imm, )
+            return "OR [0x0x%04X]" % (imm, )
         elif opcode == 0xb: # XOR
-            return "XOR [%04X]" % (imm, )
+            return "XOR [0x%04X]" % (imm, )
         elif opcode == 0xc: # SHIFT
             if (imm & 0x8000) > 0:
                 return "RSHIFT %d" % (imm & 0xF,)
             else:
                 return "LSHIFT %d" % (imm & 0xF,)
         elif opcode == 0xd: # ADDI
-            return "XOR %04X" % (imm, )
+            return "ADDI 0x%04X" % (imm, )
         elif opcode == 0xe: # ILOAD
-            return "ILOAD %04X" % (data, )
+            return "ILOAD 0x%04X" % (data, )
         elif opcode == 0xf: # ISTORE
-            return "ISTORE %04X" % (data, )
+            return "ISTORE 0x%04X" % (data, )
         elif opcode == 0x10: # CALL
-            return "CALL %04X" % (data, )
+            return "CALL 0x%04X" % (data, )
         elif opcode == 0x11: # RET
-            return "RET %04X" % (data, )
+            return "RET 0x%04X" % (data, )
         elif opcode == 0x12: # IN
-            return "IN %02X" % (data & 0xFF,)
+            return "IN 0x%02X" % (data & 0xFF,)
         elif opcode == 0x13: # OUT
-            return "OUT %02X" % (data & 0xFF,)
+            return "OUT 0x%02X" % (data & 0xFF,)
         elif opcode == 0x14: # CLI (DI)
             return "CLI (DI) %s" % (Bits(uint=data & 0xF, length=4).bin,)
         elif opcode == 0x15: # SEI (EI)
@@ -217,8 +217,9 @@ class SCOMP_STATE:
 
     def check_interrupt(self):
         # TIMER
-        if self.ticks % (TICKS_PER_SEC / 10):
-            self.interrupt(2)
+        if self.device_mem[self.devices['CTIMER']] > 0:
+            if self.ticks % (TICKS_PER_TEN_MS * self.device_mem[self.devices['CTIMER']]) == 0:
+                self.interrupt(2)
 
     def step(self):
         if self.IRQ is not None:
@@ -252,7 +253,7 @@ class SCOMP_STATE:
         self.device_mem[self.devices[param]] = val & 0xFFFF
 
 
-TICKS_PER_SEC = 4500000
+TICKS_PER_TEN_MS = 40000
 
 if __name__ == '__main__':
     argp = argparse.ArgumentParser()
@@ -294,6 +295,7 @@ if __name__ == '__main__':
             dis = scomp.step()
             # print('%s --> %s' % (scomp.__str__(), dis), end='\n')
         else:
+            time.sleep(0.01)
             cmd = screen.getch(0,0)
             if cmd == ord('s'):
                 if not run:
@@ -317,9 +319,9 @@ if __name__ == '__main__':
                 val = ""
                 if (scomp.PC + i) >= 0:
                     if i != 0:
-                        val = "(  ) %04X: %s" % (scomp.PC + i, scomp.instruction_at_location(scomp.PC + i),)
+                        val = "(  ) 0x%04X: %s" % (scomp.PC + i, scomp.instruction_at_location(scomp.PC + i),)
                     else:
-                        val = "(->) %04X: %s" % (scomp.PC + i, scomp.instruction_at_location(scomp.PC + i),)
+                        val = "(->) 0x%04X: %s" % (scomp.PC + i, scomp.instruction_at_location(scomp.PC + i),)
                     core_win.addstr(14+i, 0, val)
             core_win.refresh()
             screen.refresh()
