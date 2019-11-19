@@ -61,18 +61,20 @@ class SCOMP_STATE:
         self.device_mem[self.devices['XIO']] = 0b10000
 
     def INPUT(self, PORT):
-        if not (enable_screen):
-            print("INPUT(0x%02X):" % (PORT,))
+        # if not (enable_screen):
+        #     print("INPUT(0x%02X):" % (PORT,))
         return self.device_mem[PORT]
 
     def OUTPUT(self, port, val):
-        if not (enable_screen):
-            print("OUTPUT(0x%02X): %d" % (port, val))
+        # if not (enable_screen):
+        #     print("OUTPUT(0x%02X): %d" % (port, val))
 
         if self.devices["SSEG1"] == port:
-            print(f"SSEG1: {val}")
+            print("SSEG1: 0x%04X" % (val,))
         if self.devices["SSEG2"] == port:
-            print(f"SSEG2: {val}")
+            print("SSEG2: 0x%04X" % (val,))
+        if self.devices['TIMER'] == port:
+            self.device_mem[self.devices['TIMER']] = 0
 
         self.device_mem[port] = val
 
@@ -234,6 +236,8 @@ class SCOMP_STATE:
         disassembled = self.execute_instruction(opcode, data)
         self.ticks += 1
         self.check_interrupt()
+        if self.ticks % 400000 == 0:
+            self.device_mem[self.devices['TIMER']] += 1
         return disassembled
 
     def __repr__(self):
