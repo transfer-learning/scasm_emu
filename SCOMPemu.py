@@ -67,12 +67,12 @@ class SCOMP_STATE:
 
     def OUTPUT(self, port, val):
         # if not (enable_screen):
-        #     print("OUTPUT(0x%02X): %d" % (port, val))
+        #     print("OUTPUT(0x%02X): 0x%04X (%d)" % (port, val, two_comp_tostring(val)))
 
         if self.devices["SSEG1"] == port:
-            print("SSEG1: 0x%04X" % (val,))
+            print("SSEG1: 0x%04X (%d)" % (val, two_comp_tostring(val)))
         if self.devices["SSEG2"] == port:
-            print("SSEG2: 0x%04X" % (val,))
+            print("SSEG2: 0x%04X (%d)" % (val, two_comp_tostring(val)))
         if self.devices['TIMER'] == port:
             self.device_mem[self.devices['TIMER']] = 0
 
