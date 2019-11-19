@@ -157,7 +157,7 @@ def simulation_thread(controls_queue, sensor_queue):
     next_sensor = 0
     framerate = 60.
 
-    sensor_update_time = 1. / 30.
+    sensor_update_time = 1. / 120.
     last_sensor_update = pygame.time.get_ticks()
 
     hits = []
@@ -169,7 +169,7 @@ def simulation_thread(controls_queue, sensor_queue):
 
         if not controls_queue.empty():
             new_controls = controls_queue.get()
-            controls = new_controls / 1000
+            controls = new_controls / 1500
 
         pos = robot.state.pose
 

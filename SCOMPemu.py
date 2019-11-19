@@ -15,8 +15,17 @@ controls_q = Queue(1)
 sensor_q = Queue(1)
 cur_control = np.asmatrix([[0, 0]]).T
 cur_sensors = SensorInfo([5 for i in range(8)], 0, 0)
+theta_offset = 0
 
 counter = 0
+
+
+def get_raw_theta() -> int:
+    rad = cur_sensors.theta
+    deg = int(rad * 180 / math.pi)
+    deg = (deg + 360) % 360
+    return deg & 0xFFFF
+
 
 def two_comp_tostring(number):
     return Bits(uint=number, length=16).int
@@ -85,10 +94,10 @@ class SCOMP_STATE:
         # if not (enable_screen):
         #     print("INPUT(0x%02X):" % (PORT,))
         if self.devices["THETA"] == port:
-            rad = cur_sensors.theta
-            rad = math.atan2(math.sin(rad), math.cos(rad))
-            deg = int(rad * 180 / math.pi)
+            deg = get_raw_theta()
+            deg = deg - theta_offset
             deg = (deg + 360) % 360
+            print(f"theta: {deg}")
             return deg & 0xFFFF
         if self.devices["DIST0"] <= port <= self.devices["DIST7"]:
             num = port - self.devices["DIST0"]
@@ -103,6 +112,7 @@ class SCOMP_STATE:
         return self.device_mem[port]
 
     def OUTPUT(self, port, val):
+        global theta_offset
         # if not (enable_screen):
         #     print("OUTPUT(0x%02X): 0x%04X (%d)" % (port, val, two_comp_tostring(val)))
 
@@ -117,11 +127,14 @@ class SCOMP_STATE:
         if self.devices["LVELCMD"] == port:
             cur_control[0, 0] = two_comp_tostring(val)
             put_control_queue(cur_control)
-            print(f"[L] Trying to out {cur_control.T}")
+            # print(f"[L] Trying to out {cur_control.T}")
         if self.devices["RVELCMD"] == port:
             cur_control[1, 0] = two_comp_tostring(val)
             put_control_queue(cur_control)
-            print(f"[R] Trying to out {cur_control.T}")
+            # print(f"[R] Trying to out {cur_control.T}")
+        if self.devices["RESETPOS"] == port:
+            theta_offset = get_raw_theta()
+            print(f"resetpos called. theta offset: {theta_offset}")
 
         self.device_mem[port] = val
 
