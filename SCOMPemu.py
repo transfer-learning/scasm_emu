@@ -49,6 +49,7 @@ class SCOMP_STATE:
         self.IRQ = None
         self.ticks = 0
         self.SONAR_BIT_MASK = 0
+        self.TIMER_COUNTUP = 0
 
         self.device_mem = [0x0] * 256
         self.devices = {
@@ -94,6 +95,8 @@ class SCOMP_STATE:
     def INPUT(self, port) -> int:
         # if not (enable_screen):
         #     print("INPUT(0x%02X):" % (PORT,))
+        if self.devices['TIMER'] == port:
+            return self.TIMER_COUNTUP
         if self.devices["THETA"] == port:
             deg = get_raw_theta()
             deg = deg - theta_offset
@@ -120,6 +123,8 @@ class SCOMP_STATE:
         global theta_offset
         # if not (enable_screen):
         #     print("OUTPUT(0x%02X): 0x%04X (%d)" % (port, val, two_comp_tostring(val)))
+        if self.devices['TIMER'] == port:
+            self.TIMER_COUNTUP = 0
         if self.devices['SONAREN'] == port:
             self.SONAR_BIT_MASK = val & 0xFF
 
@@ -129,8 +134,6 @@ class SCOMP_STATE:
             print("SSEG2: 0x%04X (%d)" % (val, two_comp_tostring(val)))
         if self.devices["LCD"] == port:
             print("LCD: 0x%04X (%d)" % (val, two_comp_tostring(val)))
-        if self.devices['TIMER'] == port:
-            self.device_mem[self.devices['TIMER']] = 0
         if self.devices["LVELCMD"] == port:
             cur_control[0, 0] = two_comp_tostring(val)
             put_control_queue(cur_control)
@@ -310,8 +313,8 @@ class SCOMP_STATE:
         disassembled = self.execute_instruction(opcode, data)
         self.ticks += 1
         self.check_interrupt()
-        if self.ticks % 400000 == 0:
-            self.device_mem[self.devices['TIMER']] += 1
+        if self.ticks % TICKS_PER_TEN_MS == 0:
+            self.TIMER_COUNTUP += 1
         return disassembled
 
     def __repr__(self):
@@ -331,7 +334,7 @@ class SCOMP_STATE:
         self.device_mem[self.devices[param]] = val & 0xFFFF
 
 
-TICKS_PER_TEN_MS = 40
+TICKS_PER_TEN_MS = 300
 
 
 def print_screen(screen, core_win, scomp, run):
@@ -426,7 +429,6 @@ def main():
         else:
             print_screen(screen, core_win, scomp, run)
         get_sensor_data()
-        time.sleep(0.00001)
     print(scomp)
 
 
