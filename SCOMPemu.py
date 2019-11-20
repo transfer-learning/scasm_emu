@@ -48,6 +48,7 @@ class SCOMP_STATE:
         self.INT_AC = None
         self.IRQ = None
         self.ticks = 0
+        self.SONAR_BIT_MASK = 0
 
         self.device_mem = [0x0] * 256
         self.devices = {
@@ -101,6 +102,10 @@ class SCOMP_STATE:
             return deg & 0xFFFF
         if self.devices["DIST0"] <= port <= self.devices["DIST7"]:
             num = port - self.devices["DIST0"]
+            num_bit_mask = 1 << num
+            if num_bit_mask & self.SONAR_BIT_MASK == 0:
+                print(f"DIE! reading disabled sonar: {num} at location 0x{self.PC:04X}")
+                exit(-1)
             reading = int(1000 * cur_sensors.sonar[num])
             if reading == 5000:
                 reading = 0x7FFF
@@ -115,6 +120,8 @@ class SCOMP_STATE:
         global theta_offset
         # if not (enable_screen):
         #     print("OUTPUT(0x%02X): 0x%04X (%d)" % (port, val, two_comp_tostring(val)))
+        if self.devices['SONAREN'] == port:
+            self.SONAR_BIT_MASK = val & 0xFF
 
         if self.devices["SSEG1"] == port:
             print("SSEG1: 0x%04X (%d)" % (val, two_comp_tostring(val)))
