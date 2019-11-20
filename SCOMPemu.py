@@ -288,7 +288,7 @@ class SCOMP_STATE:
     def step(self):
         global counter
         if self.IRQ is not None:
-            if self.EI and self.INT is None:
+            if 0 < self.IRQ <= 4 and (self.EI & (1 << (self.IRQ - 1)) > 0) and (self.INT is None):
                 self.INT = self.PC
                 self.INT_AC = self.AC
                 self.AC = 0
