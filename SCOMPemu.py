@@ -365,6 +365,7 @@ def get_sensor_data():
 
     if not sensor_q.empty():
         cur_sensors = sensor_q.get_nowait()
+        # print(f"cur_sensors: {cur_sensors.sonar}")
 
 
 def main():

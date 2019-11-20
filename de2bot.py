@@ -7,7 +7,7 @@ class State:
         self.twist = twist.copy()
 
 class DE2Config:
-    def __init__(self, axle_length: float = 0.15):
+    def __init__(self, axle_length: float = 0.122):
         self.axle_length = axle_length
 
     def __str__(self):
